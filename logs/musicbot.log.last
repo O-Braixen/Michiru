@@ -1,0 +1,129 @@
+[1024.265050888] 2021-02-23 22:26:33,727 - INFO - launcher: Starting sanity checks
+[1024.265050888] 2021-02-23 22:26:33,727 - INFO - launcher: Checking for Python 3.5+
+[1024.265050888] 2021-02-23 22:26:33,727 - INFO - launcher: Checking console encoding
+[1024.265050888] 2021-02-23 22:26:33,727 - INFO - launcher: Setting console encoding to UTF-8
+[1024.265050888] 2021-02-23 22:26:33,727 - INFO - launcher: Ensuring we're in the right environment
+[1136.544227600] 2021-02-23 22:26:33,839 - INFO - launcher: Adding local bins/ folder to path
+[17703.132390976] 2021-02-23 22:26:50,406 - INFO - launcher: Required checks passed.
+[17756.546020508] 2021-02-23 22:26:50,459 - INFO - launcher: Optional checks passed.
+[17807.134389877] 2021-02-23 22:26:50,510 - INFO - launcher: Moving old musicbot log
+
+######################### PRE-RUN SANITY CHECKS PASSED #########################
+
+[24.4497497081756592] 2021-02-23 22:26:57,152 - INFO - musicbot.config | In config.py::MainThread(7868), line 132 in run_checks: Using i18n: config/i18n/br.json
+[24.4731633663177490] 2021-02-23 22:26:57,176 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 225 in _setup_logging: Set logging level to INFO
+[24.4821999073028564] 2021-02-23 22:26:57,185 - WARNING - musicbot.permissions | In permissions.py::MainThread(7868), line 198 in validate: Max search items can't be larger than 100. Setting to 100.
+[24.5005085468292236] 2021-02-23 22:26:57,203 - WARNING - musicbot.permissions | In permissions.py::MainThread(7868), line 198 in validate: Max search items can't be larger than 100. Setting to 100.
+[24.5019717216491699] 2021-02-23 22:26:57,205 - DEBUG - musicbot.json | In json.py::MainThread(7868), line 8 in __init__: Init JSON obj with config/i18n/br.json
+[24.6384842395782471] 2021-02-23 22:26:57,341 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 90 in __init__: Starting MusicBot version_unknown
+[24.6395463943481445] 2021-02-23 22:26:57,342 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 96 in __init__: Loaded autoplaylist with 1168 entries
+[24.9301056861877441] 2021-02-23 22:26:57,633 - DEBUG - musicbot.spotify | In spotify.py::MainThread(7868), line 74 in get_token: Created a new access token: {'access_token': 'BQDiNshzjHC5b9RYxDA3_lusH7drLLveW31f69d-GFsUBRqGRj0Cy1omovfkM43FL0wbNV_m0MFevffP-NY', 'token_type': 'Bearer', 'expires_in': 3600, 'scope': '', 'expires_at': 1614133617}
+[24.9305107593536377] 2021-02-23 22:26:57,633 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 121 in __init__: Authenticated with Spotify successfully using client ID and secret.
+[27.6809146404266357] 2021-02-23 22:27:00,384 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 951 in on_ready: Connection established, ready to go.
+[27.6810603141784668] 2021-02-23 22:27:00,384 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 342 in _cache_app_info: Caching app info
+[27.8597412109375000] 2021-02-23 22:27:00,562 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 773 in _scheck_ensure_env: Ensuring data folders exist
+[28.0479974746704102] 2021-02-23 22:27:00,751 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 783 in _scheck_ensure_env: Deleted old audio cache
+[28.0489268302917480] 2021-02-23 22:27:00,752 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 789 in _scheck_server_permissions: Checking server permissions
+[28.0489268302917480] 2021-02-23 22:27:00,752 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 793 in _scheck_autoplaylist: Auditing autoplaylist
+[28.0489268302917480] 2021-02-23 22:27:00,752 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 797 in _scheck_configs: Validating config
+[28.0498986244201660] 2021-02-23 22:27:00,753 - DEBUG - musicbot.config | In config.py::MainThread(7868), line 236 in async_validate: Validating options...
+[28.0498986244201660] 2021-02-23 22:27:00,753 - DEBUG - musicbot.config | In config.py::MainThread(7868), line 250 in async_validate: Acquired owner id via API
+[28.0498986244201660] 2021-02-23 22:27:00,753 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 800 in _scheck_configs: Validating permissions config
+[28.0498986244201660] 2021-02-23 22:27:00,753 - DEBUG - musicbot.permissions | In permissions.py::MainThread(7868), line 94 in async_validate: Validating permissions...
+[28.0498986244201660] 2021-02-23 22:27:00,753 - DEBUG - musicbot.permissions | In permissions.py::MainThread(7868), line 98 in async_validate: Fixing automatic owner group
+[28.0498986244201660] 2021-02-23 22:27:00,753 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 968 in on_ready: Connected: 772500735144624149/Dj Michiru Kagemori#0381
+[28.0518584251403809] 2021-02-23 22:27:00,755 - WARNING - musicbot.bot | In bot.py::MainThread(7868), line 996 in on_ready: Owner could not be found on any guild (id: 197071176810364928)
+
+[28.0528542995452881] 2021-02-23 22:27:00,756 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 998 in on_ready: Guild List:
+[28.0537936687469482] 2021-02-23 22:27:00,756 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 1001 in on_ready:  - ●◇ Braixen's Server ◇●
+[28.0665376186370850] 2021-02-23 22:27:00,769 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 1001 in on_ready:  - Kitsune village ™
+[28.0674602985382080] 2021-02-23 22:27:00,770 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 1039 in on_ready: Not bound to any text channels
+[28.0684318542480469] 2021-02-23 22:27:00,771 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 1065 in on_ready: Not autojoining any voice channels
+[36.6856384277343750] 2021-02-23 22:27:09,388 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2706 in on_message: 197071176810364928/Braixen#9895: Msummon
+[37.1436245441436768] 2021-02-23 22:27:09,846 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 733 in deserialize_queue: Deserializing queue for 407520868768677888
+[37.5303871631622314] 2021-02-23 22:27:10,233 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 425 in get_player: Created player via deserialization for guild 407520868768677888 with 1 entries
+[37.5303871631622314] 2021-02-23 22:27:10,233 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 536 in on_player_finished_playing: Running on_player_finished_playing
+[37.5303871631622314] 2021-02-23 22:27:10,233 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 709 in serialize_queue: Serializing queue for 407520868768677888
+[37.5323445796966553] 2021-02-23 22:27:10,235 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 1935 in cmd_summon: Joining ●◇ Braixen's Server ◇●/《🖱》Conversa
+[37.5382218360900879] 2021-02-23 22:27:10,241 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 56 in get_ready_future: Created future for None
+[37.5401473045349121] 2021-02-23 22:27:10,243 - INFO - musicbot.entry | In entry.py::MainThread(7868), line 292 in _really_download: Download started: https://youtube.com/watch?v=am-Y0cuz0mw
+[40.0372028350830078] 2021-02-23 22:27:12,740 - INFO - musicbot.entry | In entry.py::MainThread(7868), line 302 in _really_download: Download complete: https://youtube.com/watch?v=am-Y0cuz0mw
+[40.0430634021759033] 2021-02-23 22:27:12,746 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 270 in get_mean_volume: Calculating mean volume of audio_cache\youtube-am-Y0cuz0mw-Iron_Maiden_-_Montsegur.webm
+[40.0489153861999512] 2021-02-23 22:27:12,752 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 244 in run_command: Starting asyncio subprocess (<Process 3508>) with command: "C:\FFmpeg\bin\ffmpeg" -i "audio_cache\youtube-am-Y0cuz0mw-Iron_Maiden_-_Montsegur.webm" -af "volumedetect" -f null /dev/null
+[43.1192243099212646] 2021-02-23 22:27:15,822 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 287 in get_mean_volume: Calculated mean volume as -9.0
+[43.1201970577239990] 2021-02-23 22:27:15,823 - FFMPEG - musicbot.player | In player.py::MainThread(7868), line 293 in _play: Creating player with options: -nostdin -af "volume=-0.0dB" audio_cache\youtube-am-Y0cuz0mw-Iron_Maiden_-_Montsegur.webm
+[43.1231608390808105] 2021-02-23 22:27:15,826 - DEBUG - musicbot.player | In player.py::MainThread(7868), line 306 in _play: Playing <musicbot.player.SourcePlaybackCounter object at 0x06E67EF0> using <discord.voice_client.VoiceClient object at 0x061A1CD0>
+[43.1329252719879150] 2021-02-23 22:27:15,836 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 460 in on_player_play: Running on_player_play
+[43.1338760852813721] 2021-02-23 22:27:15,837 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 709 in serialize_queue: Serializing queue for 407520868768677888
+[51.3780250549316406] 2021-02-23 22:27:24,081 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2936 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel)
+[51.3790037631988525] 2021-02-23 22:27:24,082 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[53.7419927120208740] 2021-02-23 22:27:26,445 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[53.7703514099121094] 2021-02-23 22:27:26,473 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[61.8965504169464111] 2021-02-23 22:27:34,599 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2706 in on_message: 197071176810364928/Braixen#9895: Mplay Foo Fighters - Rope (Deadmau5 Mix)
+[65.3633632659912109] 2021-02-23 22:27:38,066 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 1408 in cmd_play: {'_type': 'url', 'url': 'ytsearch:Foo Fighters - Rope (Deadmau5 Mix)', 'ie_key': None, 'extractor': 'generic', 'webpage_url': 'Foo Fighters - Rope (Deadmau5 Mix)', 'webpage_url_basename': 'Foo Fighters - Rope (Deadmau5 Mix)', 'extractor_key': 'Generic'}
+[67.9112000465393066] 2021-02-23 22:27:40,614 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 56 in get_ready_future: Created future for None
+[67.9131934642791748] 2021-02-23 22:27:40,616 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 624 in on_player_entry_added: Running on_player_entry_added
+[67.9131934642791748] 2021-02-23 22:27:40,616 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 709 in serialize_queue: Serializing queue for 407520868768677888
+[67.9141395092010498] 2021-02-23 22:27:40,617 - INFO - musicbot.entry | In entry.py::MainThread(7868), line 292 in _really_download: Download started: https://www.youtube.com/watch?v=u4eGPxByYoE
+[69.2764930725097656] 2021-02-23 22:27:41,979 - INFO - musicbot.entry | In entry.py::MainThread(7868), line 302 in _really_download: Download complete: https://www.youtube.com/watch?v=u4eGPxByYoE
+[69.2803704738616943] 2021-02-23 22:27:41,983 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 270 in get_mean_volume: Calculating mean volume of audio_cache\youtube-u4eGPxByYoE-Foo_Fighters_-_Rope_Deadmau5_Mix.webm
+[69.2852342128753662] 2021-02-23 22:27:41,988 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 244 in run_command: Starting asyncio subprocess (<Process 6184>) with command: "C:\FFmpeg\bin\ffmpeg" -i "audio_cache\youtube-u4eGPxByYoE-Foo_Fighters_-_Rope_Deadmau5_Mix.webm" -af "volumedetect" -f null /dev/null
+[71.0508823394775391] 2021-02-23 22:27:43,754 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 287 in get_mean_volume: Calculated mean volume as -10.5
+[71.2627685070037842] 2021-02-23 22:27:43,965 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2706 in on_message: 197071176810364928/Braixen#9895: Mskip
+[71.2744905948638916] 2021-02-23 22:27:43,977 - DEBUG - musicbot.player | In player.py::Thread-3(6000), line 220 in _playback_finished: Deleting file: audio_cache\youtube-am-Y0cuz0mw-Iron_Maiden_-_Montsegur.webm
+[71.2764358520507812] 2021-02-23 22:27:43,979 - DEBUG - musicbot.player | In player.py::Thread-3(6000), line 225 in _playback_finished: File deleted: audio_cache\youtube-am-Y0cuz0mw-Iron_Maiden_-_Montsegur.webm
+[71.4375925064086914] 2021-02-23 22:27:44,140 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 536 in on_player_finished_playing: Running on_player_finished_playing
+[71.4375925064086914] 2021-02-23 22:27:44,140 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 709 in serialize_queue: Serializing queue for 407520868768677888
+[71.4402716159820557] 2021-02-23 22:27:44,143 - DEBUG - musicbot.entry | In entry.py::MainThread(7868), line 56 in get_ready_future: Created future for audio_cache\youtube-u4eGPxByYoE-Foo_Fighters_-_Rope_Deadmau5_Mix.webm
+[71.4402716159820557] 2021-02-23 22:27:44,143 - FFMPEG - musicbot.player | In player.py::MainThread(7868), line 293 in _play: Creating player with options: -nostdin -af "volume=-0.0dB" audio_cache\youtube-u4eGPxByYoE-Foo_Fighters_-_Rope_Deadmau5_Mix.webm
+[71.4493155479431152] 2021-02-23 22:27:44,152 - DEBUG - musicbot.player | In player.py::MainThread(7868), line 306 in _play: Playing <musicbot.player.SourcePlaybackCounter object at 0x077E5FB0> using <discord.voice_client.VoiceClient object at 0x061A1CD0>
+[71.4515364170074463] 2021-02-23 22:27:44,154 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 460 in on_player_play: Running on_player_play
+[71.4515364170074463] 2021-02-23 22:27:44,154 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 709 in serialize_queue: Serializing queue for 407520868768677888
+[91.5866255760192871] 2021-02-23 22:28:04,289 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2936 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel)
+[91.5866255760192871] 2021-02-23 22:28:04,289 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[93.9209873676300049] 2021-02-23 22:28:06,624 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[93.9219672679901123] 2021-02-23 22:28:06,625 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[101.9317464828491211] 2021-02-23 22:28:14,634 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 857 in safe_delete_message: Cannot delete message "Mskip", message not found
+[108.2793676853179932] 2021-02-23 22:28:20,982 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2968 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel or member deafened)
+[108.2813427448272705] 2021-02-23 22:28:20,984 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[111.5792317390441895] 2021-02-23 22:28:24,282 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[111.5811593532562256] 2021-02-23 22:28:24,284 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[125.2071087360382080] 2021-02-23 22:28:37,910 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2968 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel or member deafened)
+[125.2090694904327393] 2021-02-23 22:28:37,912 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[128.2325024604797363] 2021-02-23 22:28:40,935 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[128.2334823608398438] 2021-02-23 22:28:40,936 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[141.8996055126190186] 2021-02-23 22:28:54,602 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2968 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel or member deafened)
+[141.9034864902496338] 2021-02-23 22:28:54,606 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[143.5655102729797363] 2021-02-23 22:28:56,268 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[143.5674769878387451] 2021-02-23 22:28:56,270 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[151.8243205547332764] 2021-02-23 22:29:04,527 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2968 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel or member deafened)
+[151.8252687454223633] 2021-02-23 22:29:04,528 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[152.9844539165496826] 2021-02-23 22:29:05,687 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[152.9864213466644287] 2021-02-23 22:29:05,689 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[223.4727292060852051] 2021-02-23 22:30:16,175 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2936 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel)
+[223.4746835231781006] 2021-02-23 22:30:16,177 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[224.9199962615966797] 2021-02-23 22:30:17,623 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[224.9219563007354736] 2021-02-23 22:30:17,625 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[226.1377706527709961] 2021-02-23 22:30:18,840 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2936 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel)
+[226.1387825012207031] 2021-02-23 22:30:18,841 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[228.4073138236999512] 2021-02-23 22:30:21,110 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[228.4083261489868164] 2021-02-23 22:30:21,111 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[231.3282279968261719] 2021-02-23 22:30:24,031 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2968 in on_voice_state_update: Pausing in ●◇ Braixen's Server ◇●/《🖱》Conversa (empty channel or member deafened)
+[231.3291893005371094] 2021-02-23 22:30:24,032 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 527 in on_player_pause: Running on_player_pause
+[350.9876568317413330] 2021-02-23 22:32:23,690 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2925 in on_voice_state_update: Unpausing in ●◇ Braixen's Server ◇●/《🖱》Conversa
+[350.9876568317413330] 2021-02-23 22:32:23,690 - DEBUG - musicbot.bot | In bot.py::MainThread(7868), line 523 in on_player_resume: Running on_player_resume
+[373.3608551025390625] 2021-02-23 22:32:46,064 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 2706 in on_message: 197071176810364928/Braixen#9895: Mdisconnect
+[373.4006977081298828] 2021-02-23 22:32:46,103 - DEBUG - musicbot.player | In player.py::Thread-6(3568), line 220 in _playback_finished: Deleting file: audio_cache\youtube-u4eGPxByYoE-Foo_Fighters_-_Rope_Deadmau5_Mix.webm
+[373.4006977081298828] 2021-02-23 22:32:46,103 - DEBUG - musicbot.player | In player.py::Thread-6(3568), line 225 in _playback_finished: File deleted: audio_cache\youtube-u4eGPxByYoE-Foo_Fighters_-_Rope_Deadmau5_Mix.webm
+[5589.7535045146942139] 2021-02-23 23:59:42,456 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 942 in on_resumed: 
+Reconnected to discord.
+
+[18224.5943961143493652] 2021-02-24 03:30:17,297 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 942 in on_resumed: 
+Reconnected to discord.
+
+[24093.4825849533081055] 2021-02-24 05:08:06,185 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 942 in on_resumed: 
+Reconnected to discord.
+
+[24873.6017198562622070] 2021-02-24 05:21:06,304 - INFO - musicbot.bot | In bot.py::MainThread(7868), line 942 in on_resumed: 
+Reconnected to discord.
+
