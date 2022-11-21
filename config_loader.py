@@ -9,7 +9,7 @@ bools = {
 }
 
 DEFAULT_CONFIG = {
-    "DEFAULT_PREFIX": "!!!",
+    "DEFAULT_PREFIX": "!!",
     "AUTO_SYNC_COMMANDS": True,
     "OWNER_IDS": "",
     "COMMAND_LOG": False,
@@ -26,6 +26,7 @@ DEFAULT_CONFIG = {
     "INVITE_PERMISSIONS": 534735285328,
     "ENABLE_LOGGER": False,
     "INTERACTION_BOTS": "",
+    "GLOBAL_PREFIX": True,
 
     ################
     ### Database ###
@@ -54,6 +55,7 @@ DEFAULT_CONFIG = {
     ##############################################
     "SPOTIFY_CLIENT_ID": '',
     "SPOTIFY_CLIENT_SECRET": '',
+    "SEARCH_PROVIDER": "ytsearch",
 
     ##################################################
     ### Sistema de música - Local lavalink stuffs: ###
@@ -159,6 +161,7 @@ def load_config():
         "AUTO_DOWNLOAD_LAVALINK_SERVERLIST",
         "ENABLE_LOGGER",
         "GUILD_DEAFEN_WARN",
+        "GLOBAL_PREFIX",
 
         "BANS_INTENT",
         "DM_MESSAGES_INTENT",
@@ -187,7 +190,7 @@ def load_config():
         except KeyError:
             raise Exception(f"Você usou uma configuração inválida! {i}: {CONFIG[i]}")
 
-    CONFIG["RPC_SERVER"] = CONFIG["RPC_SERVER"].replace("$PORT", environ.get("PORT", "8080"))
+    CONFIG["RPC_SERVER"] = CONFIG["RPC_SERVER"].replace("$PORT", environ.get("PORT", "80"))
 
     if CONFIG["PRESENCE_INTERVAL"] < 300:
         CONFIG["PRESENCE_INTERVAL"] = 300

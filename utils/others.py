@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class Test:
 
     def is_done(self):
-        return True
+        return False
 
 class CustomContext(commands.Context):
     bot: BotCore
@@ -28,6 +28,7 @@ class CustomContext(commands.Context):
         self.response.defer = self.defer
         self.user = self.author
         self.guild_id = self.guild.id
+        self.channel_id = self.channel.id
         self.store_message = None
 
     async def defer(self, ephemeral: bool = False):
@@ -78,7 +79,7 @@ class PlayerControls:
     volume = "musicplayer_volume"
     shuffle = "musicplayer_shuffle"
     seek_to_start = "musicplayer_seek_to_start"
-    readd = "musicplayer_readd"
+    readd = "musicplayer_readd_songs"
     loop_mode = "musicplayer_loop_mode"
     queue = "musicplayer_queue"
     nightcore = "musicplayer_nightcore"
@@ -212,7 +213,24 @@ async def send_message(
         if components:
             kwargs["components"] = components
 
-        await inter.send(text, ephemeral=True, **kwargs)
+        try:
+
+            try:
+                channel = inter.music_bot.get_channel(inter.channel_id)
+            except AttributeError:
+                channel = inter.channel
+
+            if isinstance(channel.parent, disnake.ForumChannel) and (channel.archived or channel.locked) and \
+                    channel.guild.me.guild_permissions.manage_threads:
+                await channel.edit(archived=False, locked=False)
+
+        except AttributeError:
+            pass
+
+        try:
+            await inter.send(text, ephemeral=True, **kwargs)
+        except disnake.InteractionTimedOut:
+            await inter.channel.send(text, **kwargs)
 
 
 async def send_idle_embed(
@@ -314,7 +332,20 @@ async def pin_list(inter, query: str, *, prefix=""):
 async def select_bot_pool(inter):
 
     if isinstance(inter, CustomContext):
-        return inter.bot
+        if not inter.bot.config["GLOBAL_PREFIX"]:
+            return inter.bot
+
+    elif not inter.guild:
+
+        if not inter.bot.config["INTERACTION_BOTS"]:
+            raise GenericError("**Não há bots compatíveis com este comando no servidor...**")
+
+        invite = disnake.utils.oauth_url(inter.bot.user.id,
+                                         permissions=disnake.Permissions(inter.bot.config['INVITE_PERMISSIONS']),
+                                         scopes=('bot', 'applications.commands'))
+
+        raise GenericError("**Esta interação está indisponível sem eu estar no servidor como bot...\n\n"
+                           f"[Clique aqui]({invite}) para me adicionar.**")
 
     bots = {}
 
@@ -391,6 +422,9 @@ async def select_bot_pool(inter):
             return
 
         inter.response = select_interaction.response
+
+        if msg:
+            inter.store_message = msg
 
         try:
             return bots[int(select_interaction.data.values[0])]

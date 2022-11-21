@@ -126,13 +126,13 @@ class Track:
         self.info = info
         self.query = query
 
-        self.title = info.get('title')
+        self.title = info.get('title', '')[:97]
         self.identifier = info.get('identifier', '')
         self.ytid = self.identifier if re.match(r"^[a-zA-Z0-9_-]{11}$", self.identifier) else None
         self.length = info.get('length')
         self.duration = self.length
         self.uri = info.get('uri')
-        self.author = info.get('author')
+        self.author = info.get('author', '')[:97]
 
         self.is_stream = info.get('isStream')
         self.dead = False
@@ -319,7 +319,7 @@ class Player:
 
         channel = self.bot.get_channel(channel_id)
 
-        if not guild.voice_client:
+        if not guild.voice_client or not guild.me.voice:
             await channel.connect(cls=WavelinkVoiceClient, reconnect=True)
 
         elif guild.me.voice.channel.id != channel_id:

@@ -16,6 +16,7 @@ def download_file(url, filename):
     with open(filename, 'wb') as f:
         f.write(r.content)
     r.close()
+    return True
 
 def validate_java(cmd: str, debug: bool = False):
     try:
@@ -45,12 +46,15 @@ def run_lavalink(
         except KeyError:
             pass
 
-        dirs.extend(
-            [
-                "./.java/jdk-13/bin/java",
-                "~/.jabba/jdk/zulu@1.17.0-0/bin/java",
-            ]
-        )
+        if os.name == "nt":
+            dirs.append(".java\\jdk-13\\bin\\java")
+        else:
+            dirs.extend(
+                [
+                    "./.java/jdk-13/bin/java",
+                    "~/.jabba/jdk/zulu@1.17.0-0/bin/java",
+                ]
+            )
 
         for cmd in dirs:
             if validate_java(cmd):
@@ -94,11 +98,14 @@ def run_lavalink(
                 os.remove("install_jabba.sh")
                 java_cmd = "~/.jabba/jdk/zulu@1.17.0-0/bin/java"
 
+    clear_plugins = False
+
     for filename, url in (
         ("Lavalink.jar", lavalink_file_url),
         ("application.yml", "https://github.com/zRitsu/LL-binaries/releases/download/0.0.1/application.yml")
     ):
-        download_file(url, filename)
+        if download_file(url, filename):
+            clear_plugins = True
 
     if lavalink_cpu_cores >= 1:
         java_cmd += f" -XX:ActiveProcessorCount={lavalink_cpu_cores}"
@@ -111,13 +118,17 @@ def run_lavalink(
 
     java_cmd += " -jar Lavalink.jar"
 
+    if clear_plugins:
+        try:
+            shutil.rmtree("./plugins")
+        except:
+            pass
+
     print(f"Iniciando o servidor Lavalink (dependendo da hospedagem o lavalink pode demorar iniciar, "
           f"o que pode ocorrer falhas em algumas tentativas de conexão até ele iniciar totalmente).\n{'-' * 30}")
 
-    lavalink_process = subprocess.Popen(java_cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, shell=True)
+    subprocess.Popen(java_cmd, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL, shell=True)
 
     if lavalink_additional_sleep:
         print(f"Aguarde {lavalink_additional_sleep} segundos...\n{'-' * 30}")
         time.sleep(lavalink_additional_sleep)
-
-    return lavalink_process

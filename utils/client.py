@@ -3,7 +3,6 @@ import asyncio
 import datetime
 import json
 import logging
-import subprocess
 from configparser import ConfigParser
 from importlib import import_module
 from subprocess import check_output
@@ -14,7 +13,7 @@ import disnake
 from typing import Optional, Union, List
 from config_loader import load_config
 from web_app import WSClient, start
-from .music.errors import GenericError
+from .music.errors import GenericError, PoolException
 from .music.local_lavalink import run_lavalink
 from .music.models import music_mode
 from .music.spotify import spotify_client
@@ -49,10 +48,11 @@ class BotPool:
         self.database: Union[MongoDatabase, LocalDatabase] = None
         self.ws_client: Optional[WSClient] = None
         self.spotify: Optional[Client] = None
-        self.lavalink_process: Optional[subprocess.Popen] = None
         self.config = {}
         self.commit = ""
         self.remote_git_url = ""
+        self.max_counter: int = 0
+        self.message_ids: set = set()
 
     def load_playlist_cache(self):
 
@@ -67,13 +67,12 @@ class BotPool:
         if not self.spotify:
             return
 
-        await self.bots[0].wait_until_ready()  # método temporário para contornar um problema de inicialização
         await self.spotify.authorize()
 
     async def connect_rpc_ws(self):
 
         if not self.config["RUN_RPC_SERVER"] and (
-                not self.config["RPC_SERVER"] or self.config["RPC_SERVER"] == "ws://localhost:8080/ws"):
+                not self.config["RPC_SERVER"] or self.config["RPC_SERVER"] == "ws://localhost:80/ws"):
             pass
         else:
             await self.ws_client.ws_loop()
@@ -83,7 +82,7 @@ class BotPool:
         self.config = load_config()
 
         if not self.config["DEFAULT_PREFIX"]:
-            self.config["DEFAULT_PREFIX"] = "!!!"
+            self.config["DEFAULT_PREFIX"] = "!!"
 
         if self.config['ENABLE_LOGGER']:
 
@@ -184,17 +183,19 @@ class BotPool:
                 case_insensitive=True,
                 intents=intents,
                 test_guilds=test_guilds,
-                sync_commands=False,
-                sync_commands_debug=True,
+                command_sync_flags=commands.CommandSyncFlags.none(),
                 embed_color=self.config["EMBED_COLOR"],
                 default_prefix=default_prefix,
-                pool=self
+                pool=self,
+                number=int(self.max_counter)
             )
 
             bot.token = token
 
             bot.load_extension("jishaku")
             bot.get_command("jsk").hidden = True
+
+            self.max_counter += 1
 
             @bot.check
             async def forum_check(ctx: CustomContext):
@@ -213,52 +214,68 @@ class BotPool:
 
                     return True
 
+            if bot.config["GLOBAL_PREFIX"]:
+
+                @bot.listen("on_command_completion")
+                async def message_id_cleanup(ctx: CustomContext):
+
+                    try:
+                        ctx.bot.pool.message_ids.remove(f"{ctx.guild.id}-{ctx.channel.id}-{ctx.message.id}")
+                    except:
+                        pass
 
             @bot.listen()
             async def on_ready():
 
                 if not bot.bot_ready:
 
-                    if bot.config["AUTO_SYNC_COMMANDS"]:
+                    if not bot.config["INTERACTION_BOTS"] or str(bot.user.id) in bot.config["INTERACTION_BOTS"]:
 
-                        if not bot.config["INTERACTION_BOTS"] or str(bot.user.id) in bot.config["INTERACTION_BOTS"]:
+                        self._command_sync_flags = commands.CommandSyncFlags.all()
 
-                            self._sync_commands = True
-                            bot.load_modules(bot_name)
+                        bot.load_modules(bot_name)
+
+                        if bot.config["AUTO_SYNC_COMMANDS"]:
                             await bot.sync_app_commands(force=True)
 
-                        else:
+                    else:
 
-                            self._sync_commands = False
+                        self._command_sync_flags = commands.CommandSyncFlags.none()
 
-                            interaction_invites = ""
+                        if self.config["INTERACTION_BOTS"] and self.config["GLOBAL_PREFIX"]:
 
-                            for b in self.bots:
+                            @bot.slash_command(description="Use este comando caso tenha problemas de outros comandos"
+                                                           " de barra (/) não estarem disponíveis.",
+                                               default_member_permissions=disnake.Permissions(manage_guild=True))
+                            async def info(inter: disnake.AppCmdInter):
 
-                                if str(b.user.id) not in self.config["INTERACTION_BOTS"]:
-                                    continue
+                                interaction_invites = ""
 
-                                interaction_invites += f"[`{disnake.utils.escape_markdown(str(b.user.name))}`]({disnake.utils.oauth_url(b.user.id, scopes=['applications.commands'])}) "
+                                for b in self.bots:
 
-                            if interaction_invites:
+                                    try:
+                                        if str(b.user.id) not in self.config["INTERACTION_BOTS"]:
+                                            continue
+                                    except:
+                                        continue
 
-                                @bot.slash_command(description="Use este comando caso tenha problemas de outros comandos"
-                                                               " de barra (/) não estarem disponíveis.",
-                                                   default_member_permissions=disnake.Permissions(manage_guild=True))
-                                async def info(inter: disnake.AppCmdInter):
-                                    embed = disnake.Embed(
-                                        description="Aviso: para usar todos os meus comandos de barra (/) será necessário "
-                                                    "ter os comandos de barra de uma das integrações listadas abaixo no seu servidor:\n"
-                                                    f"{interaction_invites}\n\n"
-                                                    "Se aparecer nenhum comando das integrações citadas acima, "
-                                                    "clique em uma delas para adicioná-la no seu servidor.",
-                                        color=0x2F3136
-                                    )
+                                    interaction_invites += f"[`{disnake.utils.escape_markdown(str(b.user.name))}`]({disnake.utils.oauth_url(b.user.id, scopes=['applications.commands'])}) "
 
-                                    await inter.send(embed=embed, ephemeral=True)
+                                embed = disnake.Embed(
+                                    description="Aviso: para usar todos os meus comandos de barra (/) será necessário "
+                                                "ter os comandos de barra de uma das integrações listadas abaixo no seu servidor:\n"
+                                                f"{interaction_invites}\n\n"
+                                                "Se aparecer nenhum comando das integrações citadas acima, "
+                                                "clique em uma delas para adicioná-la no seu servidor.",
+                                    color=0x2F3136
+                                )
 
+                                await inter.send(embed=embed, ephemeral=True)
+
+                        if bot.config["AUTO_SYNC_COMMANDS"]:
                             await bot.sync_app_commands(force=True)
-                            bot.load_modules(bot_name)
+
+                        bot.load_modules(bot_name)
 
                     if not bot.owner:
                         botowner = (await bot.application_info())
@@ -291,7 +308,7 @@ class BotPool:
             if not k.lower().startswith("token_bot_"):
                 continue
 
-            bot_name = k[10:] or "Sec. Bot"
+            bot_name = k[10:] or f"Bot_{self.max_counter}"
 
             load_bot(bot_name, v)
 
@@ -299,7 +316,7 @@ class BotPool:
             raise Exception("O token do bot não foi configurado devidamente!")
 
         if start_local:
-            self.lavalink_process = run_lavalink(
+            run_lavalink(
                 lavalink_file_url=self.config['LAVALINK_FILE_URL'],
                 lavalink_initial_ram=self.config['LAVALINK_INITIAL_RAM'],
                 lavalink_ram_limit=self.config['LAVALINK_RAM_LIMIT'],
@@ -335,7 +352,7 @@ class BotCore(commands.Bot):
         self.session: Optional[aiohttp.ClientError] = None
         self.pool: BotPool = kwargs.pop('pool')
         self.config = self.pool.config
-        self.default_prefix = kwargs.pop("default_prefix", "!!!")
+        self.default_prefix = kwargs.pop("default_prefix", "!!")
         self.spotify: Optional[SpotifyClient] = self.pool.spotify
         self.session = aiohttp.ClientSession()
         self.ws_client = self.pool.ws_client
@@ -347,6 +364,7 @@ class BotCore(commands.Bot):
         self.uptime = disnake.utils.utcnow()
         self.env_owner_ids = set()
         self.dm_cooldown = commands.CooldownMapping.from_cooldown(rate=2, per=30, type=commands.BucketType.member)
+        self.number = kwargs.pop("number", 0)
         super().__init__(*args, **kwargs)
         self.music = music_mode(self)
         self.public = None
@@ -401,7 +419,7 @@ class BotCore(commands.Bot):
 
     def check_skin(self, skin: str):
 
-        if skin is None or skin == "default" or skin not in self.player_skins:
+        if skin is None or skin not in self.player_skins:
             return self.default_skin
 
         return skin
@@ -415,12 +433,12 @@ class BotCore(commands.Bot):
 
     async def sync_app_commands(self, force=False):
 
-        if not self._sync_commands and not force:
+        if not self.command_sync_flags.sync_commands and not force:
             return
 
-        self._sync_commands = True
+        self._command_sync_flags = commands.CommandSyncFlags.all()
         await self._sync_application_commands()
-        self._sync_commands = False
+        self._command_sync_flags = commands.CommandSyncFlags.none()
 
     async def can_send_message(self, message: disnake.Message):
 
@@ -476,7 +494,7 @@ class BotCore(commands.Bot):
                     embed.description += f"\n\nTambém tenho comandos de texto por prefixo.\n" \
                                         f"Para ver todos os meus comandos de texto use **{prefix}help**\n"
 
-                if not self._sync_commands and self.config["INTERACTION_BOTS"]:
+                if not self.command_sync_flags.sync_commands and self.config["INTERACTION_BOTS"]:
 
                     interaction_invites = ""
 
@@ -575,9 +593,11 @@ class BotCore(commands.Bot):
             return
 
         if self.config["COMMAND_LOG"] and inter.guild:
-            print(f"cmd log: [user: {inter.author} - {inter.author.id}] - [guild: {inter.guild.name} - {inter.guild.id}]"
-                  f" - [cmd: {inter.data.name}] "
-                  f"{datetime.datetime.utcnow().strftime('%d/%m/%Y - %H:%M:%S')} (UTC)\n" + ("-"*15))
+            try:
+                print(f"cmd log: [user: {inter.author} - {inter.author.id}] - [guild: {inter.guild.name} - {inter.guild.id}]"
+                      f" - [cmd: {inter.data.name}] {datetime.datetime.utcnow().strftime('%d/%m/%Y - %H:%M:%S')} (UTC) - {inter.filled_options}\n" + ("-" * 15))
+            except:
+                traceback.print_exc()
 
         await super().on_application_command(inter)
 

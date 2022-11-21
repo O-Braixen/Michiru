@@ -8,10 +8,8 @@ from disnake.ext import commands
 from utils.client import BotCore
 import json
 import asyncio
-from utils.db import DBModel
-from utils.music.spotify import SpotifyTrack
-from utils.music.checks import can_connect
-from utils.music.models import LavalinkPlayer, LavalinkTrack
+from utils.music.checks import can_connect, ensure_bot_instance
+from utils.music.models import LavalinkPlayer, LavalinkTrack, PartialTrack
 from utils.others import CustomContext
 
 
@@ -64,10 +62,6 @@ class PlayerSession(commands.Cog):
                 if not text_channel:
                     continue
 
-                if not data.get("skin"):
-                    # tempfix
-                    data["skin"] = (await self.bot.get_data(guild.id, db_name=DBModel.guilds))["player_controller"]["skin"]
-
                 try:
                     creator = data["player_creator"]
                 except KeyError:
@@ -75,7 +69,7 @@ class PlayerSession(commands.Cog):
 
                 try:
                     message = await text_channel.fetch_message(data["message"])
-                except disnake.NotFound:
+                except:
                     message = None
 
                 player: LavalinkPlayer = self.bot.music.get_player(
@@ -100,7 +94,7 @@ class PlayerSession(commands.Cog):
 
                 for info in data["tracks"]:
                     if info["sourceName"] == "spotify":
-                        t = SpotifyTrack(info=info)
+                        t = PartialTrack(info=info)
                     else:
                         t = LavalinkTrack(id_=info["id"], info=info)
                     del t.info["id"]
@@ -108,7 +102,7 @@ class PlayerSession(commands.Cog):
 
                 for info in data["played"]:
                     if info["sourceName"] == "spotify":
-                        t = SpotifyTrack(info=info)
+                        t = PartialTrack(info=info)
                     else:
                         t = LavalinkTrack(id_=info["id"], info=info)
                     del t.info["id"]
@@ -144,13 +138,17 @@ class PlayerSession(commands.Cog):
         except FileNotFoundError:
             return
 
+
     @commands.max_concurrency(1, commands.BucketType.default)
     @commands.is_owner()
+    @ensure_bot_instance(return_first=True)
     @commands.command(hidden=True, aliases=["savep"])
-    async def saveplayers(self, ctx: CustomContext):
+    async def saveplayers(self, ctx: CustomContext, *args):
 
         saved_players = 0
         ignored_players = 0
+
+        reset_ids  = any(a in args for a in ("--reset", "--resetids", "-reset", "-resetids"))
 
         async with ctx.typing():
 
@@ -165,15 +163,15 @@ class PlayerSession(commands.Cog):
                     played = []
 
                     if player.current:
-                        player.current.info["id"] = player.current.id
+                        player.current.info["id"] = player.current.id if not reset_ids else ""
                         tracks.append(player.current.info)
 
                     for t in player.queue:
-                        t.info["id"] = t.id
+                        t.info["id"] = t.id if not reset_ids else ""
                         tracks.append(t.info)
 
                     for t in player.played:
-                        t.info["id"] = t.id
+                        t.info["id"] = t.id if not reset_ids else ""
                         played.append(t.info)
 
                     if not tracks and not played:

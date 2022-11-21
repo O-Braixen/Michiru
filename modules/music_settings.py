@@ -7,8 +7,7 @@ import humanize
 from disnake.ext import commands
 from typing import TYPE_CHECKING, Union
 from utils.db import DBModel
-from utils.music.checks import user_cooldown
-from utils.music.converters import time_format
+from utils.music.checks import user_cooldown, ensure_bot_instance
 from utils.music.errors import GenericError
 from utils.others import send_idle_embed, CustomContext, select_bot_pool
 from utils.music.models import LavalinkPlayer
@@ -53,7 +52,7 @@ class MusicSettings(commands.Cog):
 
         await bot.update_data(inter.guild_id, guild_data, db_name=DBModel.guilds)
 
-        guild = bot.get_guild(inter.guild_id)
+        guild = bot.get_guild(inter.guild_id) or inter.guild
 
         embed = disnake.Embed(
             color=self.bot.get_color(guild.me),
@@ -61,11 +60,19 @@ class MusicSettings(commands.Cog):
                         f"Agora {'não ' if opt == 'Ativar' else ''}irei me conectar em canais onde há outros bots.**"
         )
 
-        await inter.send(embed=embed, ephemeral=True)
+        try:
+            await inter.edit_original_message(embed=embed, components=None)
+        except (AttributeError, disnake.InteractionNotEditable):
+            try:
+                await inter.response.edit_message(embed=embed, components=None)
+            except:
+                await inter.send(embed=embed, ephemeral=True)
 
     @commands.cooldown(1, 10, commands.BucketType.user)
+    @ensure_bot_instance(return_first=True)
     @commands.command(aliases=["mgf", "migrarfavoritos", "migrate"],
                       description="Migrar seus favoritos para database global (comando temporário).")
+    @ensure_bot_instance()
     async def migratefav(self, ctx: CustomContext):
 
         async with ctx.typing():
@@ -91,6 +98,7 @@ class MusicSettings(commands.Cog):
     @commands.has_guild_permissions(manage_guild=True)
     @commands.bot_has_guild_permissions(manage_channels=True, create_public_threads=True)
     @commands.dynamic_cooldown(user_cooldown(1, 30), commands.BucketType.guild)
+    @ensure_bot_instance(return_first=True)
     @commands.command(
         name="setup", aliases=["songrequestchannel", "sgrc"], usage="[id do canal ou #canal] [--reset]",
         description="Criar/escolher um canal dedicado para pedir músicas e deixar player fixado."
@@ -117,7 +125,6 @@ class MusicSettings(commands.Cog):
 
     @commands.dynamic_cooldown(user_cooldown(1, 30), commands.BucketType.guild)
     @commands.slash_command(
-        name=disnake.Localized("setup_songrequest_channel", data={disnake.Locale.pt_BR: "configurar_canal_de_música"}),
         description=f"{desc_prefix}Criar/escolher um canal dedicado para pedir músicas e deixar player fixado.",
         default_member_permissions=disnake.Permissions(manage_guild=True)
     )
@@ -146,20 +153,19 @@ class MusicSettings(commands.Cog):
         if not bot:
             return
 
-        await inter.response.defer(ephemeral=True)
-
-        guild = bot.get_guild(inter.guild_id)
+        guild = bot.get_guild(inter.guild_id) or inter.guild
 
         if not guild.me.guild_permissions.manage_channels or not guild.me.guild_permissions.create_public_threads:
             raise commands.BotMissingPermissions(["manage_channels", "create_public_threads"])
 
         channel = bot.get_channel(inter.channel.id)
+
         try:
             target = bot.get_channel(target.id)
         except AttributeError:
             pass
 
-        kwargs = {
+        channel_kwargs = {
             "overwrites": {
                 guild.me: disnake.PermissionOverwrite(
                     embed_links=True,
@@ -174,6 +180,8 @@ class MusicSettings(commands.Cog):
                 )
             }
         }
+
+        await inter.response.defer(ephemeral=True)
 
         guild_data = await bot.get_data(guild.id, db_name=DBModel.guilds)
 
@@ -201,7 +209,7 @@ class MusicSettings(commands.Cog):
 
         async def get_message(original_message):
 
-            if original_message and original_message.channel != target:
+            if original_message and original_message.channel != target and original_message.guild.id == target.guild.id:
 
                 try:
                     if isinstance(original_message.channel.parent, disnake.ForumChannel):
@@ -236,16 +244,36 @@ class MusicSettings(commands.Cog):
             except AttributeError:
                 id_ = ""
 
-            msg_select = await inter.send(
+            kwargs = {}
+            try:
+                func = inter.edit_original_message
+            except:
+                try:
+                    func = inter.store_message.edit
+                except:
+                    try:
+                        func = inter.response.edit_message
+                    except:
+                        func = inter.send
+                        kwargs = {"ephemeral": True}
+
+            if isinstance(inter, CustomContext):
+                txt = "mencionando um canal de forum existente"
+            else:
+                txt = "usando um canal de forum na opção \"canal\" deste mesmo comando"
+
+            msg_select = await func(
                 embed=disnake.Embed(
-                    description="**Qual tipo de canal para pedir música você quer criar?**",
+                    description="**Qual tipo de canal para pedir música você quer criar?**\n"
+                                f"`Nota: para canal de forum, cancele e use o comando novamente {txt}.`",
                     color=self.bot.get_color(guild.me)
                 ).set_footer(text="Você tem apenas 30 segundos para clicar em um botão."),
                 components=[
                     disnake.ui.Button(label="Canal de texto", custom_id=f"text_channel_{id_}", emoji="💬"),
-                    disnake.ui.Button(label="Canal de voz", custom_id=f"voice_channel_{id_}", emoji="🔊")
+                    disnake.ui.Button(label="Canal de voz", custom_id=f"voice_channel_{id_}", emoji="🔊"),
+                    disnake.ui.Button(label="Cancelar", custom_id="voice_channel_cancel", emoji="❌")
                 ],
-                ephemeral=True
+                **kwargs
             )
 
             def check(i: disnake.MessageInteraction):
@@ -257,7 +285,6 @@ class MusicSettings(commands.Cog):
 
             try:
                 inter = await self.bot.wait_for("button_click", check=check, timeout=30)
-                await inter.response.defer()
             except asyncio.TimeoutError:
                 try:
                     inter.application_command.reset_cooldown(inter)
@@ -267,7 +294,10 @@ class MusicSettings(commands.Cog):
                 if msg_select:
                     func = msg_select.edit
                 else:
-                    func = (await inter.original_message()).edit
+                    try:
+                        func = (await inter.original_message()).edit
+                    except:
+                        func = inter.message.edit
 
                 await func(
                     embed=disnake.Embed(
@@ -278,7 +308,18 @@ class MusicSettings(commands.Cog):
                 )
                 return
 
-            if original_message:
+            if inter.data.custom_id == "voice_channel_cancel":
+                await inter.response.edit_message(
+                    embed=disnake.Embed(
+                        description="**Operação cancelada...**",
+                        color=self.bot.get_color(guild.me),
+                    ), components=None
+                )
+                return
+
+            await inter.response.defer()
+
+            if original_message and original_message.guild.id == inter.guild_id:
 
                 try:
                     await original_message.edit(content=None, embed=embed_archived, view=None)
@@ -309,7 +350,7 @@ class MusicSettings(commands.Cog):
 
             if isinstance(target, disnake.ForumChannel):
 
-                kwargs.clear()
+                channel_kwargs.clear()
 
                 thread_wmessage = await target.create_thread(
                     name=f"{bot.user.name} song request",
@@ -345,7 +386,7 @@ class MusicSettings(commands.Cog):
                             message = m
                             break
 
-            await target.edit(**kwargs)
+            await target.edit(**channel_kwargs)
 
             channel = target
 
@@ -398,12 +439,16 @@ class MusicSettings(commands.Cog):
         )
         try:
             await inter.edit_original_message(embed=embed, components=None)
-        except AttributeError:
-            await inter.send(embed=embed, ephemeral=True)
+        except (AttributeError, disnake.InteractionNotEditable):
+            try:
+                await inter.response.edit_message(embed=embed, components=None)
+            except:
+                await inter.send(embed=embed, ephemeral=True)
 
     @commands.has_guild_permissions(manage_guild=True)
     @commands.bot_has_guild_permissions(manage_threads=True)
     @commands.dynamic_cooldown(user_cooldown(1, 30), commands.BucketType.guild)
+    @ensure_bot_instance(return_first=True)
     @commands.command(
         name="reset", usage="[--delete]",
         description="Resetar as configurações relacionadas ao canal de pedir música (song request)."
@@ -417,7 +462,6 @@ class MusicSettings(commands.Cog):
 
     @commands.dynamic_cooldown(user_cooldown(1, 30), commands.BucketType.guild)
     @commands.slash_command(
-        name=disnake.Localized("reset", data={disnake.Locale.pt_BR: "resetar_canal"}),
         description=f"{desc_prefix}Resetar as configurações relacionadas ao canal de pedir música (song request).",
         default_member_permissions=disnake.Permissions(manage_guild=True)
     )
@@ -437,7 +481,7 @@ class MusicSettings(commands.Cog):
 
         await inter.response.defer(ephemeral=True)
 
-        guild = bot.get_guild(inter.guild_id)
+        guild = bot.get_guild(inter.guild_id) or inter.guild
 
         if not guild.me.guild_permissions.manage_threads:
             raise commands.BotMissingPermissions(["manage_threads"])
@@ -446,9 +490,13 @@ class MusicSettings(commands.Cog):
 
         guild_data = await bot.get_data(guild.id, db_name=DBModel.guilds)
 
-        channel = bot.get_channel(int(guild_data['player_controller']['channel'] or 0))
+        try:
+            channel = bot.get_channel(int(guild_data['player_controller']['channel'])) or \
+                      bot.fetch_channel(int(guild_data['player_controller']['channel']))
+        except:
+            channel = None
 
-        if not channel:
+        if not channel or channel.guild.id != inter.guild_id:
             raise GenericError(f"**Não há canais de pedido de música configurado (ou o canal foi deletado).**")
 
         try:
@@ -475,7 +523,10 @@ class MusicSettings(commands.Cog):
         try:
             func = inter.edit_original_message
         except AttributeError:
-            func = inter.send
+            try:
+                func = inter.response.edit_message
+            except AttributeError:
+                func = inter.send
 
         await func(
             embed=disnake.Embed(
@@ -517,13 +568,13 @@ class MusicSettings(commands.Cog):
 
     @commands.has_guild_permissions(manage_guild=True)
     @commands.dynamic_cooldown(user_cooldown(1, 7), commands.BucketType.guild)
+    @ensure_bot_instance(return_first=True)
     @commands.command(name="adddjrole",description="Adicionar um cargo para a lista de DJ's do servidor.", usage="[id / nome / @cargo]")
     async def add_dj_role_legacy(self, ctx: CustomContext, *, role: disnake.Role):
         await self.add_dj_role(ctx, inter=ctx, role=role)
 
     @commands.dynamic_cooldown(user_cooldown(1, 7), commands.BucketType.guild)
     @commands.slash_command(
-        name=disnake.Localized("add_dj_role", data={disnake.Locale.pt_BR: "adicionar_cargo_dj"}),
         description=f"{desc_prefix}Adicionar um cargo para a lista de DJ's do servidor.",
         default_member_permissions=disnake.Permissions(manage_guild=True)
     )
@@ -534,7 +585,7 @@ class MusicSettings(commands.Cog):
     ):
 
         bot = await select_bot_pool(inter)
-        guild = bot.get_guild(inter.guild_id)
+        guild = bot.get_guild(inter.guild_id) or inter.guild
         role = guild.get_role(role.id)
 
         if role == guild.default_role:
@@ -555,13 +606,13 @@ class MusicSettings(commands.Cog):
 
     @commands.has_guild_permissions(manage_guild=True)
     @commands.dynamic_cooldown(user_cooldown(1, 7), commands.BucketType.guild)
+    @ensure_bot_instance(return_first=True)
     @commands.command(description="Remover um cargo para a lista de DJ's do servidor.", usage="[id / nome / @cargo]")
     async def remove_dj_role_legacy(self, ctx: CustomContext, *, role: disnake.Role):
         await self.remove_dj_role(ctx, inter=ctx, role=role)
 
     @commands.dynamic_cooldown(user_cooldown(1, 7), commands.BucketType.guild)
     @commands.slash_command(
-        name=disnake.Localized("removedjrole", data={disnake.Locale.pt_BR: "remover_cargo_dj"}),
         description=f"{desc_prefix}Remover um cargo para a lista de DJ's do servidor.",
         default_member_permissions=disnake.Permissions(manage_guild=True)
     )
@@ -583,7 +634,7 @@ class MusicSettings(commands.Cog):
             await inter.send("Não há cargos na lista de DJ's.", ephemeral=True)
             return
 
-        guild = bot.get_guild(inter.guild_id)
+        guild = bot.get_guild(inter.guild_id) or inter.guild
         role = guild.get_role(role.id)
 
         if str(role.id) not in guild_data['djroles']:
@@ -600,6 +651,7 @@ class MusicSettings(commands.Cog):
     @commands.has_guild_permissions(manage_guild=True)
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.max_concurrency(1, commands.BucketType.guild)
+    @ensure_bot_instance(return_first=True)
     @commands.command(description="Alterar aparência/skin do player.", name="changeskin", aliases=["setskin", "skin"])
     async def change_skin_legacy(self, ctx: CustomContext):
 
@@ -608,7 +660,6 @@ class MusicSettings(commands.Cog):
     @commands.cooldown(1, 10, commands.BucketType.guild)
     @commands.max_concurrency(1, commands.BucketType.guild)
     @commands.slash_command(
-        name=disnake.Localized("change_skin", data={disnake.Locale.pt_BR: "mudar_aparência"}),
         description=f"{desc_prefix}Alterar aparência/skin do player.",
         default_member_permissions=disnake.Permissions(manage_guild=True)
     )
@@ -633,7 +684,7 @@ class MusicSettings(commands.Cog):
 
         await inter.response.defer(ephemeral=True)
 
-        guild = bot.get_guild(inter.guild_id)
+        guild = bot.get_guild(inter.guild_id) or inter.guild
 
         guild_data = await bot.get_data(guild.id, db_name=DBModel.guilds)
 
@@ -722,7 +773,9 @@ class MusicSettings(commands.Cog):
 
         return [s for s in self.bot.player_skins if s not in self.bot.config["IGNORE_SKINS"].split()]
 
+    @ensure_bot_instance()
     @commands.cooldown(1, 5, commands.BucketType.user)
+    @ensure_bot_instance(return_first=True)
     @commands.command(
         name="nodeinfo",
         aliases=["llservers", "ll"],
@@ -733,7 +786,6 @@ class MusicSettings(commands.Cog):
 
     @commands.cooldown(1, 5, commands.BucketType.user)
     @commands.slash_command(
-        name=disnake.Localized("lavalink_servers", data={disnake.Locale.pt_BR: "servidores_lavalink"}),
         description=f"{desc_prefix}Ver informações dos servidores de música (lavalink servers)."
     )
     async def nodeinfo(self, inter: disnake.AppCmdInter):
@@ -743,7 +795,7 @@ class MusicSettings(commands.Cog):
         if not bot:
             return
 
-        guild = bot.get_guild(inter.guild_id)
+        guild = bot.get_guild(inter.guild_id) or inter.guild
 
         em = disnake.Embed(color=bot.get_color(guild.me), title="Servidores de música:")
 

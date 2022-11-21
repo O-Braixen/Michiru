@@ -10,7 +10,6 @@ from .converters import fix_characters, time_format, get_button_style
 from .filters import AudioFilter
 from ..db import DBModel
 from ..others import send_idle_embed, PlayerControls
-from .spotify import SpotifyTrack
 import traceback
 from collections import deque
 from typing import Optional, Union, TYPE_CHECKING, List
@@ -18,6 +17,138 @@ from typing import Optional, Union, TYPE_CHECKING, List
 if TYPE_CHECKING:
     from ..client import BotCore
 
+exclude_tags = ["remix", "edit", "extend"]
+
+class PartialPlaylist:
+
+    def __init__(self, data: dict):
+        self.data = data
+
+    @property
+    def tracks(self):
+        return self.data["tracks"]
+
+    @property
+    def name(self):
+        try:
+            return self.data["playlistInfo"]["name"]
+        except KeyError:
+            return
+
+    @property
+    def url(self):
+        try:
+            return self.data["playlistInfo"]["url"]
+        except KeyError:
+            return
+
+
+class PartialTrack:
+
+    def __init__(self, *, uri: str = "", title: str = "", author="", thumb: str = "", duration: int = 0,
+                 requester: int = 0, track_loops: int = 0, source_name: str = "", info: dict = None):
+
+        self.info = info or {
+            "author": fix_characters(author)[:97],
+            "title": title[:97],
+            "uri": uri,
+            "length": duration,
+            "isStream": False,
+            "isSeekable": True,
+            "sourceName": source_name,
+            "extra": {
+                "requester": requester,
+                "track_loops": track_loops,
+                "thumb": thumb
+            }
+        }
+
+        self.id = ""
+        self.thumb = self.info["extra"]["thumb"]
+
+    def __repr__(self):
+        return f"{self.info['sourceName']} - {self.duration} - {self.authors_string} - {self.title}"
+
+    @property
+    def uri(self) -> str:
+        return self.info["uri"]
+
+    @property
+    def title(self) -> str:
+        return f"{self.author} - {self.single_title}"
+
+    @property
+    def single_title(self) -> str:
+        return self.info["title"]
+
+    @property
+    def author(self) -> str:
+        return self.info["author"]
+
+    @property
+    def authors_string(self) -> str:
+        try:
+            return ", ".join(self.info["extra"]["authors"])
+        except KeyError:
+            return self.author
+
+    @property
+    def authors_md(self) -> str:
+        try:
+            return self.info["extra"]["authors_md"]
+        except KeyError:
+            return ""
+
+    @property
+    def authors(self) -> List[str]:
+        try:
+            return self.info["extra"]["authors"]
+        except KeyError:
+            return [self.author]
+
+    @property
+    def requester(self) -> int:
+        return self.info["extra"]["requester"]
+
+    @property
+    def track_loops(self) -> int:
+        return self.info["extra"]["track_loops"]
+
+    @property
+    def is_stream(self) -> bool:
+        return self.info["isStream"]
+
+    @property
+    def duration(self) -> int:
+        return self.info["length"]
+
+    @property
+    def album_name(self) -> str:
+        try:
+            return self.info["extra"]["album"]["name"]
+        except KeyError:
+            return ""
+
+    @property
+    def album_url(self) -> str:
+        try:
+            return self.info["extra"]["album"]["url"]
+        except KeyError:
+            return ""
+
+    @property
+    def playlist_name(self) -> str:
+        try:
+            return self.info["extra"]["playlist"]["name"]
+        except KeyError:
+            return ""
+
+    @property
+    def playlist_url(self) -> str:
+        try:
+            return self.info["extra"]["playlist"]["url"]
+        except KeyError:
+            return ""
 
 class LavalinkTrack(wavelink.Track):
 
@@ -25,7 +156,7 @@ class LavalinkTrack(wavelink.Track):
 
     def __init__(self, *args, **kwargs):
         try:
-            args[1]['title'] = fix_characters(args[1]['title'])
+            args[1]['title'] = fix_characters(args[1]['title'])[:97]
         except IndexError:
             pass
         super().__init__(*args, **kwargs)
@@ -42,7 +173,7 @@ class LavalinkTrack(wavelink.Track):
 
         try:
             self.info["extra"]["playlist"] = {
-                "name": kwargs["playlist"]["name"],
+                "name": kwargs["playlist"]["name"][:97],
                 "url": kwargs["playlist"]["url"]
             }
         except KeyError:
@@ -154,7 +285,7 @@ class LavalinkPlayer(wavelink.Player):
         self.command_log: str = ""
         self.command_log_emoji: str = ""
         self.is_closing: bool = False
-        self.last_message_id: Optional[int] = None
+        self.last_message_id: Optional[int] = kwargs.pop("last_message_id", None)
         self.keep_connected: bool = kwargs.pop("keep_connected", False)
         self.update: bool = False
         self.updating: bool = False
@@ -205,15 +336,19 @@ class LavalinkPlayer(wavelink.Player):
     async def channel_cleanup(self):
 
         try:
-            if not isinstance(self.text_channel.parent, disnake.ForumChannel):
-                return
+            if isinstance(self.text_channel.parent, disnake.ForumChannel) and \
+                    self.text_channel.owner_id == self.bot.user.id and self.text_channel.message_count > 1:
+                await self.text_channel.purge(check=lambda m: m.channel.id != m.id)
         except AttributeError:
+            pass
+
+        try:
+            self.last_message_id = int(self.last_message_id)
+        except TypeError:
             return
 
-        if self.text_channel.owner_id != self.bot.user.id or self.text_channel.message_count < 1:
-            return
-
-        await self.text_channel.purge(check=lambda m: m.channel.id != m.id)
+        if self.static and self.last_message_id != self.text_channel.last_message_id:
+            await self.text_channel.purge(check=lambda m: m.id != self.last_message_id)
 
     async def connect(self, channel_id: int, self_mute: bool = False, self_deaf: bool = False):
         await super().connect(channel_id, self_mute=self_mute, self_deaf=True)
@@ -229,13 +364,18 @@ class LavalinkPlayer(wavelink.Player):
         hints = list(self.initial_hints)
 
         if self.static:
-            hints.append("Você pode fixar músicas/playlists na mensagem do player quando tiver no modo de espera/oscioso "
-                         "para qualquer membro poder usá-las de forma facilitada. Para isso use o comando: /pin add "
-                         "(comando vísivel apenas membros com perm de: gerenciar servidor)")
+            hints.append("Você pode fixar músicas/playlists na mensagem do player quando tiver no modo de "
+                         "espera/oscioso para qualquer membro poder usá-las de forma facilitada. Para isso use o "
+                         "comando: /server_playlist add (comando vísivel apenas membros com perm de: gerenciar "
+                         "servidor)")
 
         elif self.bot.intents.message_content and self.controller_mode:
             hints.append("Ao criar uma conversa/thread na mensagem do player, será ativado o modo de song-request "
                         "nela (possibilitando pedir música apenas enviando o nome/link da música na conversa).")
+
+        if self.bot.config["GLOBAL_PREFIX"] and len([b for b in self.bot.pool.bots if b.public]) > 1:
+            hints.append("Você pode ter bots de música extras no servidor, compartilhando todos os seus favoritos "
+                         "e funcionando com um único prefixo e comando slash de apenas um bot, use o comando /invite")
 
         random.shuffle(hints)
         self.hints = cycle(hints)
@@ -283,16 +423,61 @@ class LavalinkPlayer(wavelink.Player):
         if not track:
             return
 
-        if isinstance(track, SpotifyTrack):
+        if isinstance(track, PartialTrack):
 
             self.locked = True
 
-            track = await self.resolve_track(track)
+            if not track.id:
+                try:
+                    await self.resolve_track(track)
+                except Exception as e:
+                    try:
+                        await self.text_channel.send(
+                            embed=disnake.Embed(
+                                description=f"Houve um problema ao tentar processar a música [{track.title}]({track.uri})... "
+                                            f"```py\n{repr(e)}```",
+                                color=0x2F3136
+                            )
+                        )
+                    except:
+                        traceback.print_exc()
+                    await self.process_next()
+                    return
 
             self.locked = False
 
-            if not track:
-                return await self.process_next()
+            if not track.id:
+                try:
+                    await self.text_channel.send(
+                        embed=disnake.Embed(
+                            description=f"A música [{track.title}]({track.uri}) não está disponível...\n"
+                                        f"Pulando para a próxima música...",
+                            color=0x2F3136
+                        ), delete_after=30
+                    )
+                except:
+                    traceback.print_exc()
+                await self.process_next()
+                return
+
+        elif not track.id:
+            t = await self.node.get_tracks(track.uri)
+
+            if not t:
+                try:
+                    await self.text_channel.send(
+                        embed=disnake.Embed(
+                            description=f"A música [{track.title}]({track.uri}) não está disponível...\n"
+                                        f"Pulando para a próxima música...",
+                            color=0x2F3136
+                        ), delete_after=30
+                    )
+                except:
+                    traceback.print_exc()
+                await self.process_next()
+                return
+
+            track.id = t[0].id
 
         self.last_track = track
 
@@ -677,13 +862,22 @@ class LavalinkPlayer(wavelink.Player):
         except:
             pass
 
-    async def resolve_track(self, track: SpotifyTrack):
+    async def resolve_track(self, track: PartialTrack):
 
         if track.id:
             return
 
         try:
-            tracks = (await self.node.get_tracks(f"ytsearch:{track.single_title} - {track.authors_string}"))
+
+            try:
+                to_search = track.info["search_uri"]
+                check_duration = False
+            except KeyError:
+                to_search = f"{self.bot.config['SEARCH_PROVIDER']}:{track.single_title} - {track.authors_string}"
+                check_duration = True
+
+            tracks = (await self.node.get_tracks(to_search))
+
             try:
                 tracks = tracks.tracks
             except AttributeError:
@@ -696,14 +890,16 @@ class LavalinkPlayer(wavelink.Player):
                 if t.is_stream:
                     continue
 
-                if (t.duration - 10000) < track.duration < (t.duration + 10000):
+                if [(i in t.title.lower() and i not in track.single_title.lower()) for i in exclude_tags]:
+                    continue
+
+                if check_duration and ((t.duration - 10000) < track.duration < (t.duration + 10000)):
                     selected_track = t
                     break
 
             if not selected_track:
                 selected_track = tracks[0]
 
-            selected_track.info["sourceName"] = "spotify"
             track.id = selected_track.id
             track.info["length"] = selected_track.duration
 
@@ -711,8 +907,9 @@ class LavalinkPlayer(wavelink.Player):
             return
         except Exception:
             traceback.print_exc()
+            return
 
-        return track
+        return
 
     async def process_rpc(
             self,
@@ -731,6 +928,8 @@ class LavalinkPlayer(wavelink.Player):
 
         thumb = self.bot.user.display_avatar.replace(size=512, static_format="png").url
 
+        users = [u for u in (users or voice_channel.voice_states) if u != self.bot.user.id]
+
         if close:
 
             stats = {
@@ -738,13 +937,17 @@ class LavalinkPlayer(wavelink.Player):
                 "bot_id": self.bot.user.id,
                 "bot_name": str(self.bot.user),
                 "thumb": thumb,
-                "users": [u for u in (users or voice_channel.voice_states) if u != self.bot.user.id]
             }
 
-            try:
-                await self.bot.ws_client.send(stats)
-            except Exception:
-                traceback.print_exc()
+            for u in users:
+
+                stats["user"] = u
+
+                try:
+                    await self.bot.ws_client.send(stats)
+                except Exception:
+                    traceback.print_exc()
+
             return
 
         if self.is_closing:
@@ -755,7 +958,6 @@ class LavalinkPlayer(wavelink.Player):
             "track": None,
             "bot_id": self.bot.user.id,
             "bot_name": str(self.bot.user),
-            "users": [m for m in (users or voice_channel.voice_states) if m != self.bot.user.id],
             "thumb": thumb,
             "info": {
                 "channel": {
@@ -765,7 +967,8 @@ class LavalinkPlayer(wavelink.Player):
                 "guild": {
                     "name": voice_channel.guild.name,
                     "id": voice_channel.guild.id,
-                }
+                },
+                "members": len(users)
             }
         }
 
@@ -788,10 +991,11 @@ class LavalinkPlayer(wavelink.Player):
 
         else:
 
-            track: Union[LavalinkTrack, SpotifyTrack] = self.current
+            track: Union[LavalinkTrack, PartialTrack] = self.current
 
             stats["track"] = {
-                "thumb": track.thumb,
+                "source": track.info["sourceName"],
+                "thumb": track.thumb if len(track.thumb) < 257 else "",
                 "title": track.single_title,
                 "url": track.uri,
                 "author": track.authors_string,
@@ -818,7 +1022,14 @@ class LavalinkPlayer(wavelink.Player):
                     }
                 )
 
-        await self.bot.ws_client.send(stats)
+        for u in users:
+
+            stats["user"] = u
+
+            try:
+                await self.bot.ws_client.send(stats)
+            except Exception:
+                traceback.print_exc()
 
     async def track_end(self):
 

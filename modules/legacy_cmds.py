@@ -7,11 +7,12 @@ from typing import Union, Optional
 from zipfile import ZipFile
 import disnake
 import dotenv
+import psutil
 import wavelink
 from disnake.ext import commands
 from utils.client import BotCore
 from utils.db import DBModel
-from utils.music.checks import check_voice, check_requester_channel
+from utils.music.checks import check_voice, check_requester_channel, ensure_bot_instance
 from utils.music.local_lavalink import run_lavalink
 from utils.music.models import LavalinkPlayer
 from utils.others import sync_message, chunk_list, EmbedPaginator, CustomContext, string_to_file
@@ -77,6 +78,7 @@ class Owner(commands.Cog):
 
     @commands.cooldown(1, 10, commands.BucketType.user)
     @commands.is_owner()
+    @ensure_bot_instance(return_first=True)
     @commands.command(
         hidden=True, aliases=["gls", "lavalink", "lllist", "lavalinkservers"],
         description="Baixar um arquivo com lista de servidores lavalink para usá-los no sistema de música."
@@ -96,6 +98,7 @@ class Owner(commands.Cog):
 
     @commands.is_owner()
     @commands.max_concurrency(1, commands.BucketType.user)
+    @ensure_bot_instance(return_first=True)
     @commands.command(hidden=True, aliases=["ull", "updatell", "llupdate", "llu"])
     async def updatelavalink(self, ctx: CustomContext, *args):
 
@@ -118,33 +121,55 @@ class Owner(commands.Cog):
                         with open(url.split("/")[-1], "wb") as f:
                             f.write(lavalink_jar)
 
-        node.restarting = True
+        if node:
 
-        for player in node.players.values():
-            txt = "O servidor de música está reiniciando e a música será retomada em alguns segundos (Por favor aguarde)..."
-            if player.static:
-                player.set_command_log(text=txt, emoji="🛠️")
-                player.update = True
-            else:
-                self.bot.loop.create_task(
-                    player.text_channel.send(
-                        embed=disnake.Embed(
-                            color=self.bot.get_color(player.guild.me),
-                            description=f"🛠️ **⠂{txt}**"
+            node.restarting = True
+
+            reset_ids = any(a in args for a in ("--reset", "--resetids", "-reset", "-resetids"))
+
+            for player in node.players.values():
+                txt = "O servidor de música está reiniciando e a música será retomada em alguns segundos (Por favor aguarde)..."
+
+                if reset_ids:
+
+                    if player.current:
+                        player.queue.appendleft(player.current)
+                        player.current = None
+
+                    for t in player.queue:
+                        t.id = ""
+
+                    for t in player.played:
+                        t.id = ""
+
+                if player.static:
+                    player.set_command_log(text=txt, emoji="🛠️")
+                    player.update = True
+                else:
+                    self.bot.loop.create_task(
+                        player.text_channel.send(
+                            embed=disnake.Embed(
+                                color=self.bot.get_color(player.guild.me),
+                                description=f"🛠️ **⠂{txt}**"
+                            )
                         )
                     )
-                )
 
-        try:
-            self.bot.pool.lavalink_process.kill()
-            self.bot.pool.lavalink_process = run_lavalink(
-                lavalink_file_url=self.bot.config['LAVALINK_FILE_URL'],
-                lavalink_initial_ram=self.bot.config['LAVALINK_INITIAL_RAM'],
-                lavalink_ram_limit=self.bot.config['LAVALINK_RAM_LIMIT'],
-                lavalink_additional_sleep=int(self.bot.config['LAVALINK_ADDITIONAL_SLEEP']),
-            )
-        except AttributeError:
-            pass
+        for process in psutil.process_iter():
+            try:
+                if "Lavalink.jar" in process.cmdline():
+                    print(f"{ctx.invoked_with} - Reiniciando lavalink...")
+                    process.terminate()
+                    run_lavalink(
+                        lavalink_file_url=self.bot.config['LAVALINK_FILE_URL'],
+                        lavalink_initial_ram=self.bot.config['LAVALINK_INITIAL_RAM'],
+                        lavalink_ram_limit=self.bot.config['LAVALINK_RAM_LIMIT'],
+                        lavalink_additional_sleep=int(self.bot.config['LAVALINK_ADDITIONAL_SLEEP']),
+                    )
+            except (psutil.AccessDenied, PermissionError):
+                continue
+            except Exception:
+                traceback.print_exc()
 
         await ctx.send(
             embed=disnake.Embed(
@@ -153,6 +178,7 @@ class Owner(commands.Cog):
             )
         )
 
+    @ensure_bot_instance(return_first=True)
     @commands.is_owner()
     @panel_command(aliases=["rd", "recarregar"], description="Recarregar os módulos.", emoji="🔄",
                    alt_name="Carregar/Recarregar módulos.")
@@ -184,6 +210,7 @@ class Owner(commands.Cog):
         else:
             return txt
 
+    @ensure_bot_instance(return_first=True)
     @commands.is_owner()
     @commands.max_concurrency(1, commands.BucketType.default)
     @panel_command(aliases=["up", "atualizar"], description="Atualizar meu code usando o git.",
@@ -397,6 +424,7 @@ class Owner(commands.Cog):
 
         return out_git
 
+    @ensure_bot_instance(return_first=True)
     @commands.is_owner()
     @panel_command(aliases=["latest", "lastupdate"], description="Ver minhas atualizações mais recentes.", emoji="📈",
                    alt_name="Ultimas atualizações")
@@ -430,6 +458,7 @@ class Owner(commands.Cog):
             return txt
 
     @commands.has_guild_permissions(manage_guild=True)
+    @ensure_bot_instance(return_first=True)
     @commands.command(description="Sincronizar/Registrar os comandos de barra no servidor.", hidden=True)
     async def syncguild(self, ctx: Union[CustomContext, disnake.MessageInteraction]):
 
@@ -441,6 +470,7 @@ class Owner(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @ensure_bot_instance(return_first=True)
     @commands.is_owner()
     @panel_command(aliases=["sync"], description="Sincronizar os comandos de barra manualmente.",
                    emoji="<:slash:944875586839527444>",
@@ -469,6 +499,7 @@ class Owner(commands.Cog):
 
     @commands.command(name="help", aliases=["ajuda"], hidden=True)
     @commands.cooldown(1, 3, commands.BucketType.member)
+    @ensure_bot_instance(return_first=True)
     async def help_(self, ctx: CustomContext, cmd_name: str = None):
 
         is_owner = await ctx.bot.is_owner(ctx.author)
@@ -547,6 +578,7 @@ class Owner(commands.Cog):
 
     @commands.has_guild_permissions(manage_guild=True)
     @commands.cooldown(1, 10, commands.BucketType.guild)
+    @ensure_bot_instance(return_first=True)
     @commands.command(
         aliases=["mudarprefixo", "prefix", "changeprefix"],
         description="Alterar o prefixo do servidor",
@@ -560,10 +592,14 @@ class Owner(commands.Cog):
         if " " in prefix or len(prefix) > 5:
             raise GenericError("**O prefixo não pode conter espaços ou ter acima de 5 caracteres.**")
 
-        data = await self.bot.get_data(ctx.guild.id, db_name=DBModel.guilds)
-
-        data["prefix"] = prefix
-        await self.bot.update_data(ctx.guild.id, data, db_name=DBModel.guilds)
+        if self.bot.config["GLOBAL_PREFIX"]:
+            data = await self.bot.get_global_data(ctx.guild.id, db_name=DBModel.guilds)
+            data["prefix"] = prefix
+            await self.bot.update_global_data(ctx.guild.id, data, db_name=DBModel.guild)
+        else:
+            data = await self.bot.get_data(ctx.guild.id, db_name=DBModel.guilds)
+            data["prefix"] = prefix
+            await self.bot.update_data(ctx.guild.id, data, db_name=DBModel.guilds)
 
         embed = disnake.Embed(
             description=f"**O prefixo deste servidor agora é:** {disnake.utils.escape_markdown(prefix)}",
@@ -572,6 +608,7 @@ class Owner(commands.Cog):
 
         await ctx.send(embed=embed)
 
+    @ensure_bot_instance(return_first=True)
     @commands.is_owner()
     @panel_command(aliases=["expsource", "export", "exs"],
                    description="Exportar minha source para um arquivo zip.", emoji="💾",
@@ -609,7 +646,7 @@ class Owner(commands.Cog):
         SECRETS.update(env_file)
 
         if not os.path.isfile("./.env-temp"):
-            shutil.copyfile("./.env-example", "./.env-temp")
+            shutil.copyfile("./.example.env", "./.env-temp")
 
         for i in SECRETS:
             if not isinstance(SECRETS[i], str):
@@ -626,15 +663,7 @@ class Owner(commands.Cog):
         except:
             pass
 
-        with ZipFile("./source.zip", 'a') as zipf:
-
-            for f in filelist.split("\n"):
-                if not f:
-                    continue
-                if f == ".env-temp":
-                    zipf.write('./.env-temp', './.env')
-                else:
-                    zipf.write(f"./{f}")
+        await self.bot.loop.run_in_executor(None, self.zip_dir, filelist.split("\n"))
 
         os.remove("./.env-temp")
 
@@ -668,8 +697,21 @@ class Owner(commands.Cog):
         else:
             return f"Arquivo [source.zip]({msg.jump_url}) foi enviado com sucesso no seu DM."
 
+    def zip_dir(self, filelist: list):
+
+        with ZipFile("./source.zip", 'a') as zipf:
+
+            for f in filelist:
+                if not f:
+                    continue
+                if f == ".env-temp":
+                    zipf.write('./.env-temp', './.env')
+                else:
+                    zipf.write(f"./{f}")
+
     @commands.is_owner()
     @commands.command(hidden=True)
+    @ensure_bot_instance(return_first=True)
     async def cleardm(self, ctx: CustomContext, amount: int = 20):
 
         counter = 0
@@ -710,6 +752,7 @@ class Owner(commands.Cog):
 
     @commands.is_owner()
     @commands.command(aliases=["sh"], hidden=True)
+    @ensure_bot_instance(return_first=True)
     async def shell(self, ctx: CustomContext, *, command: str):
 
         if command.startswith('```') and command.endswith('```'):
@@ -759,6 +802,7 @@ class Owner(commands.Cog):
 
     @check_voice()
     @commands.command(description='inicializar um player no servidor.', aliases=["spawn", "sp", "spw", "smn"])
+    @ensure_bot_instance(return_first=True)
     async def summon(self, ctx: CustomContext):
 
         try:
@@ -808,8 +852,6 @@ class Owner(commands.Cog):
             stage_perms = channel.permissions_for(ctx.guild.me)
             if stage_perms.manage_permissions:
                 await ctx.guild.me.edit(suppress=False)
-            elif stage_perms.request_to_speak:
-                await ctx.guild.me.request_to_speak()
 
             await asyncio.sleep(1.5)
 

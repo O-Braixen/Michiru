@@ -6,6 +6,9 @@ from wavelink import WavelinkException
 from utils.music.converters import time_format, perms_translations
 
 
+class PoolException(commands.CheckFailure):
+    pass
+
 class GenericError(commands.CheckFailure):
 
     def __init__(self, text: str, *, self_delete: int = None, delete_original: Optional[int] = None):
@@ -124,8 +127,15 @@ def parse_error(
     elif isinstance(error, WavelinkException):
         if (wave_error := str(error)) == "Track not found...":
             error_txt = "**Não houve resultados para sua busca...**"
+        elif "Unknown file format" in wave_error:
+            error_txt = "**Não há suporte para o link especificado...**"
+        elif "This video is not available" in wave_error:
+            error_txt = "**Este vídeo está indisponível ou privado...**"
         elif "The playlist does not exist" in wave_error:
             error_txt = "**A playlist não existe (ou está privada).**"
+        elif "not made this video available in your country" in wave_error.lower() or \
+                "who has blocked it in your country on copyright grounds" in wave_error.lower():
+            error_txt = "**O conteúdo deste link não está disponível na região no qual estou funcionando...**"
 
     if not error_txt:
         full_error_txt = "".join(traceback.format_exception(type(error), error, error.__traceback__))

@@ -2,6 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from traceback import print_exc
 from typing import TYPE_CHECKING, Optional
 from os import environ
 import aiohttp
@@ -12,20 +13,18 @@ import tornado.websocket
 from async_timeout import timeout
 
 if TYPE_CHECKING:
-    from utils.client import BotPool
-
+    from utils.client import BotPool, BotCore
 
 logging.getLogger('tornado.access').disabled = True
 
-users_ws = []
+users_ws = {}
 bots_ws = []
 
 
 class IndexHandler(tornado.web.RequestHandler):
 
-    def initialize(self, bots: list, ws_url: str):
+    def initialize(self, bots: list):
         self.bots = bots
-        self.ws_url = ws_url
         self.text = ""
 
     async def prepare(self):
@@ -47,7 +46,6 @@ class IndexHandler(tornado.web.RequestHandler):
                      f"Adicionar:<br><a href=\"{disnake.utils.oauth_url(bot.user.id, permissions=disnake.Permissions(bot.config['INVITE_PERMISSIONS']), scopes=('bot', 'applications.commands'))}\" " \
                      f"target=\"_blank\">{bot.user}</a></td></tr>"
 
-
         if not cells:
             self.text = '<h1 style=\"font-size:5vw\">Não há bots disponíveis no momento...</h1>'
 
@@ -63,11 +61,20 @@ class IndexHandler(tornado.web.RequestHandler):
             self.text = f"<p style=\"font-size:30px\">Bots Disponíveis:</p>{style}\n<table>{cells}</table>"
 
     def get(self):
-        self.write(f"{self.text}<br>(se o seu bot não apareceu na lista, tente recarregar a página, se o erro persistir "
-                   f"verifique se apareceu algo escrito com \"429: too many requests\" no console/terminal)<p>"
-                   f"<a href=\"https://github.com/zRitsu/DC-MusicBot-RPC/releases\" target=\"_blank\">Baixe o app de "
-                   f"rich presence aqui.</a></p><br>Link para adicionar no app de RPC abaixo:<p style=\"color:blue\">"
-                   f"{self.ws_url}</p><br>")
+
+        try:
+            # repl.it stuff
+            ws_url = f"<p style=\"color:blue\">wss://{environ['REPL_SLUG']}.{environ['REPL_OWNER']}.repl.co:443/ws</p>"
+        except KeyError:
+            ws_url = "<Body onLoad=\" rpcUrl()\" ><p id=\"url\" style=\"color:blue\"></p><script>function rpcUrl(){document." \
+                     "getElementById(\"url\").innerHTML = window.location.href.replace(\"http\", \"ws\")" \
+                     ".replace(\"https\", \"wss\") + \"ws\"}</script></body>"
+
+
+        self.write(f"{self.text}<br>(se o seu bot não apareceu na lista, verifique se apareceu algo escrito com \""
+                   f"429: too many requests\" no console/terminal)<p><a href=\"https://github.com/zRitsu/DC-MusicBot-RPC"
+                   f"/releases\" target=\"_blank\">Baixe o app de rich presence aqui.</a></p>Link para adicionar no app "
+                   f"de RPC abaixo: {ws_url}")
         # self.render("index.html") #será implementado futuramente...
 
 
@@ -92,11 +99,12 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
                 self.close(code=1005, reason="Desconectando: por falta de ids de usuario")
                 return
 
-            for ws in users_ws:
-                try:
-                    ws.write_message(json.dumps(data))
-                except Exception as e:
-                    print(f"Erro ao processar dados do rpc para os users [{', '.join(ws.user_ids)}]: {repr(e)}")
+            try:
+                users_ws[data["user"]].write_message(json.dumps(data))
+            except KeyError:
+                pass
+            except Exception as e:
+                print(f"Erro ao processar dados do rpc para o user [{data['user']}]: {repr(e)}")
             return
 
         is_bot = data.pop("bot", False)
@@ -107,18 +115,26 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
             bots_ws.append(self)
             return
 
+        if len(ws_id) > 3:
+            self.close(code=403, reason="Você está tentando conectar mais de 3 usuários consecutivamente...")
+            return
+
         self.user_ids = ws_id
 
         print("\n".join(f"Nova conexão - User: {u} | {data}" for u in self.user_ids))
+
+        for u_id in ws_id:
+            try:
+                users_ws[u_id].close(code=403, reason="Nova sessão iniciada...")
+            except:
+                pass
+            users_ws[u_id] = self
 
         for w in bots_ws:
             try:
                 w.write_message(json.dumps(data))
             except Exception as e:
                 print(f"Erro ao processar dados do rpc para os bot's {w.bot_ids}: {repr(e)}")
-
-        users_ws.append(self)
-
 
     def check_origin(self, origin: str):
         return True
@@ -127,7 +143,11 @@ class WebSocketHandler(tornado.websocket.WebSocketHandler):
 
         if self.user_ids:
             print("\n".join(f"Conexão Finalizada - User: {u}" for u in self.user_ids))
-            users_ws.remove(self)
+            for u_id in self.user_ids:
+                try:
+                    del users_ws[u_id]
+                except KeyError:
+                    continue
             return
 
         if not self.bot_ids:
@@ -155,14 +175,11 @@ class WSClient:
         self.pool = pool
         self.connection = None
         self.backoff: int = 7
-        self.event = asyncio.Event()
         self.data: dict = {}
         self.session: Optional[aiohttp.ClientSession] = None
+        self.connect_task = []
 
     async def connect(self):
-
-        if self.event.is_set():
-            return
 
         if not self.session:
             self.session = aiohttp.ClientSession()
@@ -170,14 +187,28 @@ class WSClient:
         self.connection = await self.session.ws_connect(self.url, heartbeat=30)
 
         self.backoff = 7
-        #print(f"RPC client conectado: {self.bot.user} - {self.url}")
+
         print("RPC client conectado, sincronizando rpc dos bots...")
+
+        self.connect_task = [asyncio.create_task(self.connect_bot_rpc())]
+
+    @property
+    def is_connected(self):
+        return self.connection and not self.connection.closed
+
+    async def connect_bot_rpc(self):
+
+        bot_ids = []
 
         for bot in self.pool.bots:
 
-            await bot.wait_until_ready()
+            try:
+                bot_ids.append(bot.user.id)
+            except:
+                await bot.wait_until_ready()
+                bot_ids.append(bot.user.id)
 
-        await self.send({"user_ids": [b.user.id for b in self.pool.bots], "bot": True}, force=True)
+        await self.send({"user_ids": bot_ids, "bot": True})
 
         await asyncio.sleep(1)
 
@@ -187,23 +218,27 @@ class WSClient:
                 if vc.voice_states:
                     bot.loop.create_task(player.process_rpc(vc))
 
-        print("RPC client - Os dados de rpc dos bots foram sincronizados com sucesso.")
+        print(f"[RPC client] - Os dados de rpc foram sincronizados com sucesso.")
 
-        self.event.set()
-
-    @property
-    def is_connected(self):
-        return self.connection and not self.connection.closed
-
-    async def send(self, data: dict, force=False):
+    async def send(self, data: dict):
 
         if not self.is_connected:
             return
 
-        if not force:
-            await self.event.wait()
+        try:
+            await self.connection.send_json(data)
+        except:
+            print_exc()
 
-        await self.connection.send_json(data)
+    def clear_tasks(self):
+
+        for t in self.connect_task:
+            try:
+                t.cancel()
+            except:
+                continue
+
+        self.connect_task.clear()
 
     async def ws_loop(self):
 
@@ -212,6 +247,7 @@ class WSClient:
             try:
 
                 if not self.is_connected:
+                    self.clear_tasks()
                     await self.connect()
 
             except Exception as e:
@@ -220,7 +256,6 @@ class WSClient:
                 else:
                     print(f"Conexão com servidor RPC perdida - Reconectando em {int(self.backoff)} segundo(s).")
 
-                self.event.clear()
                 await asyncio.sleep(self.backoff)
                 self.backoff *= 2.5
                 continue
@@ -229,7 +264,6 @@ class WSClient:
 
             if message.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                 print(f"RPC Websocket Closed: {message.extra}\nReconnecting in {self.backoff}s")
-                self.event.clear()
                 await asyncio.sleep(self.backoff)
                 continue
 
@@ -246,7 +280,9 @@ class WSClient:
 
                 for bot in self.pool.bots:
                     for player in bot.music.players.values():
-                        vc: disnake.VoiceChannel = player.bot.get_channel(player.channel_id)
+                        vc: disnake.VoiceChannel = bot.get_channel(player.channel_id)
+                        if not vc:
+                            continue
                         vc_user_ids = [i for i in vc.voice_states if i in users]
                         if vc_user_ids:
                             bot.loop.create_task(player.process_rpc(vc))
@@ -254,22 +290,16 @@ class WSClient:
                                 users.remove(i)
 
 
-def run_app(bots: Optional[list] = None, ws_url = f"http://0.0.0.0:{environ.get('PORT', 8080)}/ws"):
-
-    try:
-        # repl.it stuff
-        ws_url = f"wss://{environ['REPL_SLUG']}.{environ['REPL_OWNER']}.repl.co:443/ws"
-    except KeyError:
-        pass
+def run_app(bots: Optional[list] = None):
 
     bots = bots or []
 
     app = tornado.web.Application([
-        (r'/', IndexHandler, {'bots': bots, 'ws_url': ws_url}),
+        (r'/', IndexHandler, {'bots': bots}),
         (r'/ws', WebSocketHandler),
     ])
 
-    app.listen(environ.get("PORT", 8080))
+    app.listen(port=environ.get("PORT", 80))
 
 
 def start(bots: Optional[list] = None):

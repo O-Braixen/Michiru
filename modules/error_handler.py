@@ -5,7 +5,7 @@ from aiohttp import ClientSession
 import asyncio
 import traceback
 from utils.music.converters import URL_REG
-from utils.music.errors import parse_error
+from utils.music.errors import parse_error, PoolException
 from utils.others import send_message, CustomContext, string_to_file
 from typing import TYPE_CHECKING, Optional
 
@@ -77,6 +77,9 @@ class ErrorHandler(commands.Cog):
             except:
                 pass"""
 
+        if isinstance(error, PoolException):
+            return
+
         error_msg, full_error_msg = parse_error(inter, error)
 
         kwargs = {}
@@ -87,7 +90,7 @@ class ErrorHandler(commands.Cog):
 
         if not error_msg:
 
-            components = None
+            components = self.components
 
             kwargs["embed"].title = "Ocorreu um erro no comando:"
             kwargs["embed"].description = f"```py\n{repr(error)[:2030].replace(self.bot.http.token, 'mytoken')}```"
@@ -98,7 +101,7 @@ class ErrorHandler(commands.Cog):
 
         else:
 
-            components = self.components
+            components = None
 
             kwargs["embed"].description = error_msg
 
@@ -131,7 +134,7 @@ class ErrorHandler(commands.Cog):
             except:
                 pass"""
 
-        if isinstance(error, commands.CommandNotFound):
+        if isinstance(error, (commands.CommandNotFound, PoolException)):
             return
 
         error_msg, full_error_msg = parse_error(ctx, error)
@@ -142,7 +145,7 @@ class ErrorHandler(commands.Cog):
 
         if not error_msg:
 
-            components = None
+            components = self.components
 
             if ctx.channel.permissions_for(ctx.guild.me).embed_links:
                 kwargs["embed"] = disnake.Embed(
@@ -160,7 +163,7 @@ class ErrorHandler(commands.Cog):
 
         else:
 
-            components = self.components
+            components = None
 
             if ctx.channel.permissions_for(ctx.guild.me).embed_links:
                 kwargs["embed"] = disnake.Embed(color=disnake.Colour.red(), description=error_msg)
@@ -334,7 +337,6 @@ class ErrorHandler(commands.Cog):
                 value=f"```\n{ctx.guild_id}```"
             )
 
-
         embed.set_footer(
             text=f"{ctx.author} [{ctx.author.id}]",
             icon_url=ctx.author.display_avatar.with_static_format("png").url
@@ -346,7 +348,7 @@ class ErrorHandler(commands.Cog):
 
             if ctx.filled_options:
                 embed.description += "**Options**```\n" + \
-                                     "\n".join(f"{k} -> {disnake.utils.escape_markdown(v)}"
+                                     "\n".join(f"{k} -> {disnake.utils.escape_markdown(str(v))}"
                                                for k, v in ctx.filled_options.items()) + "```"
 
         except AttributeError:
